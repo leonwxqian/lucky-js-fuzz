@@ -2,7 +2,7 @@
 Html that generates random js statements then fuzz in the web-browser.
 
 
-Usage:
+**Usage:**
 
 a) put all of those files under a web server 
 
@@ -10,7 +10,7 @@ b) visit lucky-jsfuzz-chrome.html
 
 
 
-Sample output:
+**Sample output:**
 
 Please check sample_out.html
 
