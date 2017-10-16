@@ -1,0 +1,732 @@
+<html>
+<title>lucky-js-fuzzer</title>
+<!--
+	@author :   Wenxiang Qian (aka 'blastxiang')
+	@email  :   leonwxqian@gmail.com
+	@website:   http://nul.pw
+	@licence:   Licensed under the MIT license
+	
+    			Permission is hereby granted, free of charge, to any person obtaining a copy
+				of this software and associated documentation files (the "Software"), to deal
+				in the Software without restriction, including without limitation the rights
+				to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+				copies of the Software, and to permit persons to whom the Software is
+				furnished to do so, subject to the following conditions:
+
+				The above copyright notice and this permission notice shall be included in all
+				copies or substantial portions of the Software.
+
+				THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+				IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+				FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+				AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+				LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+				OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+				SOFTWARE.
+    
+	@usage  :   Simply open this file in the webbrowser and the fuzz work is starting
+	@last   :   Good luck fuzzing!
+-->
+<body></body>
+<script>
+var g_Seed = 0;
+var g_SeedStep = 0;
+
+var g_bUseMathyFuzz = true;
+
+//count of each type of predefined funcs
+// eg: 2max for
+//    g_rndFuncs_mathy[0] = new Function(xx); g_rndFuncs_mathy[1] = new Function(xx); 
+//    g_rndFuncs_regex[0] = new Function(xx); ...
+var g_rndFuncCount = 10;
+
+//script to init environment.
+var g_initScript = "";
+
+var g_rndFuncs_mathy;
+
+var g_globalTankCount = 0;
+
+var g_fuzzingStmtTank = new Array();
+
+var g_variant_tank_count_attrofobject = 3;
+var g_variant_tank_count_mathy = 3;
+var g_variant_tank_count_regexy = 3;
+var g_variant_tank_count_stringy = 3;
+var g_variant_tank_count_arrayy = 3;
+var g_variant_tank_count_classy = 3;
+var g_variant_tank_count_functiony = 3;
+var g_variant_tank_count_enumeratory = 3;
+var g_variant_tank_count_errory = 3;
+var g_variant_tank_count_getter = 3;
+
+//level of nested statement.
+//this means level of () [].
+// eg: 2max for  someStatement(someStatement2(someStatement3)) <-- 2 brackets
+var g_statementMaxNestLevel = 10;
+
+//fuzz statement to be outputed here.
+var g_output;
+
+const CANT_BE_INSTANT_VAL = 1;
+const CAN_BE_INSTANT_VAL = 2;
+const MUST_BE_INSTANT_VAL = 3;
+
+
+//put every variant that generates at runtime of fuzzing here. we don't care about any type or anything 
+//here, just mess this thing up.
+var g_tankVariant_runtime = new Array();
+var g_tankVariant_attrofobject = new Array();
+var g_tankVariant_arrayy = new Array();
+var g_tankVariant_classyv = new Array(); //var
+var g_tankVariant_classyf = new Array(); //function
+var g_tankVariant_functiony = new Array();
+var g_tankVariant_functiony_iterator = new Array();
+var g_tankVariant_enumeratory = new Array();
+var g_tankVariant_errory = new Array();
+var g_tankVariant_data_getaccessKeyTank = new Array();
+var g_tankVariant_data_getaccessValueTank = new Array();
+
+const NONE = 0;
+const STATEMENT = 1;
+const FRAGMENT = 2;
+
+const NUMBER = 0;  //number object prefered , but we can provide general objects whatever.
+const FLOAT = 1;
+const INTEGER = 2;
+const STRING = 3;
+const COMMA_MULTILIST = 4; //list seprated by comma (eg: 1,3,5,7,9)
+const GENERAL_OBJECT = 5;
+const REGEX = 6;
+const ARRAY = 7;
+
+//void is another name of undefined here.
+const VOID = 8;
+const UNDEFINED = VOID;
+
+const OBJECT = 9;
+const FUNCTION = 10;
+
+//'new ' is postponed because it needs a specific constructor
+var g_OneWayOp_fitForAll = new Array(
+	"+", "-", "~", "!", " typeof ", " void ", " delete "
+);
+
+var g_OneWayOp_LeftNon_Constant = new Array(
+	"++", "--"
+);
+
+//">>>",  "<<<" is not supported in Nscript
+var g_TwoWayOp_fitForAll = new Array(
+	"||", "&&", "|", "&", "==", ">", "<", ">=", "<=", " instanceof ", "+", "-", "*", "/", "^",
+	"%", ">>", "<<", "!=", "===" ,"!=="
+);
+var g_TwoWayOp_LeftNon_Constant = new Array(
+	"+=", "-=", "*=", "/=", "^="
+);
+
+//only ?: in 3-way op, skips creating array here.
+
+var g_builtinTypes = new Array(
+	"String", "Object", "Function", "Array", "Number", "RegExp", "Error"
+);
+
+var g_Nscript_builtin_things = new Array(
+	"window.Date","window.Scripting","window.MSXML2","window.ADODB","window.WScript","window.Enumerator","window.WMI","window.WinHTTP","window.Shell","window.WSH","window.ActiveXObject","window.GetObject","window.d","window.ScriptEngineBuildVersion","window.deconcept","window.hex2bin","window.rc4","window.log","window.dump","window.i","navigator.javaEnabled","navigator.taintEnabled","navigator.appCodeName","navigator.appName","navigator.appMinorVersion","navigator.cpuClass","navigator.platform","navigator.msDoNotTrack","navigator.opsProfile","navigator.userProfile","navigator.systemLanguage","navigator.userLanguage","navigator.appVersion","navigator.userAgent","navigator.onLine","navigator.cookieEnabled","navigator.mimeTypes","navigator.plugins","String.fromCharCode","Math.abs","Math.acos","Math.asin","Math.atan","Math.atan2","Math.ceil","Math.cos","Math.exp","Math.floor","Math.log","Math.max","Math.min","Math.pow","Math.random","Math.round","Math.sin","Math.sqrt","Math.tan","Math.E","Math.LN10","Math.LN2","Math.LOG2E","Math.LOG10E","Math.PI","Math.SQRT1_2","Math.SQRT2","Object.prototype.toString","Object.prototype.toLocaleString","Object.prototype.valueOf","Object.prototype.hasOwnProperty","Object.prototype.isPrototypeOf","Object.prototype.propertyIsEnumerable","Object.prototype.constructor","Array.prototype.toString","Array.prototype.toLocaleString","Array.prototype.concat","Array.prototype.join","Array.prototype.pop","Array.prototype.push","Array.prototype.reverse","Array.prototype.shift","Array.prototype.slice","Array.prototype.sort","Array.prototype.splice","Array.prototype.unshift","Array.prototype.constructor","RegExp.prototype.exec","RegExp.prototype.test","RegExp.prototype.toString","RegExp.prototype.constructor","Function.prototype.apply","Function.prototype.call","Function.prototype.prototype","Function.prototype.constructor","Number.prototype.toString","Number.prototype.toLocaleString","Number.prototype.valueOf","Number.prototype.toFixed","Number.prototype.toExponential","Number.prototype.toPrecision","Number.prototype.constructor","String.prototype.charAt","String.prototype.concat","String.prototype.indexOf","String.prototype.lastIndexOf","String.prototype.localeCompare","String.prototype.match","String.prototype.replace","String.prototype.search","String.prototype.slice","String.prototype.split","String.prototype.substr","String.prototype.substring","String.prototype.toLocaleLowerCase","String.prototype.toLocaleUpperCase","String.prototype.toLowerCase","String.prototype.toUpperCase","String.prototype.toString","String.prototype.valueOf","decodeURI","decodeURIComponent","encodeURI","encodeURIComponent","escape","eval","isFinite","isNaN","Number","parseFloat","parseInt","String","unescape"
+);
+
+//not include prototypes.
+var g_Nscript_builtin_funcs = new Array(
+	"window.Date","window.Enumerator","window.ActiveXObject","window.GetObject","window.ScriptEngineBuildVersion","window.hex2bin","window.rc4","window.log","window.dump","navigator.javaEnabled","navigator.taintEnabled","String.fromCharCode","Math.abs","Math.acos","Math.asin","Math.atan","Math.atan2","Math.ceil","Math.cos","Math.exp","Math.floor","Math.log","Math.max","Math.min","Math.pow","Math.random","Math.round","Math.sin","Math.sqrt","Math.tan","decodeURI","decodeURIComponent","encodeURI","encodeURIComponent","escape","eval","isFinite","isNaN","Number","parseFloat","parseInt","String","unescape"
+
+);
+
+var g_NScript_builtin_prototypes = new Array(
+	"Object.prototype.toString","Object.prototype.toLocaleString","Object.prototype.valueOf","Object.prototype.hasOwnProperty","Object.prototype.isPrototypeOf","Object.prototype.propertyIsEnumerable","Object.prototype.constructor","Array.prototype.toString","Array.prototype.toLocaleString","Array.prototype.concat","Array.prototype.join","Array.prototype.pop","Array.prototype.push","Array.prototype.reverse","Array.prototype.shift","Array.prototype.slice","Array.prototype.sort","Array.prototype.splice","Array.prototype.unshift","Array.prototype.constructor","RegExp.prototype.exec","RegExp.prototype.test","RegExp.prototype.toString","RegExp.prototype.constructor","Function.prototype.apply","Function.prototype.call","Function.prototype.prototype","Function.prototype.constructor","Number.prototype.toString","Number.prototype.toLocaleString","Number.prototype.valueOf","Number.prototype.toFixed","Number.prototype.toExponential","Number.prototype.toPrecision","Number.prototype.constructor","String.prototype.charAt","String.prototype.concat","String.prototype.indexOf","String.prototype.lastIndexOf","String.prototype.localeCompare","String.prototype.match","String.prototype.replace","String.prototype.search","String.prototype.slice","String.prototype.split","String.prototype.substr","String.prototype.substring","String.prototype.toLocaleLowerCase","String.prototype.toLocaleUpperCase","String.prototype.toLowerCase","String.prototype.toUpperCase","String.prototype.toString","String.prototype.valueOf"
+
+);
+
+var g_ruleList_general_assignment = new Array(
+		["=", 2, GENERAL_OBJECT, CANT_BE_INSTANT_VAL, GENERAL_OBJECT, CAN_BE_INSTANT_VAL, "[1] = [2]", STATEMENT]
+		
+);
+
+var g_ruleList_mathy_statement = new Array(
+		["++", 1, NUMBER, CANT_BE_INSTANT_VAL, "++[1]", STATEMENT],
+		["++", 1, NUMBER, CANT_BE_INSTANT_VAL, "[1]++", STATEMENT],
+		["--", 1, NUMBER, CANT_BE_INSTANT_VAL, "[1]--", STATEMENT],
+		["--", 1, NUMBER, CANT_BE_INSTANT_VAL, "--[1]", STATEMENT],
+		
+		["+=", 2, NUMBER, CANT_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] += [2]", STATEMENT],
+		["-=", 2, NUMBER, CANT_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL,"[1] -= [2]", STATEMENT],
+		["*=", 2, NUMBER, CANT_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] *= [2]", STATEMENT],
+		["/=", 2, NUMBER, CANT_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] /= [2]", STATEMENT],
+		
+		["%=", 2, NUMBER, CANT_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] %= [2]", STATEMENT],
+		["^=", 2, NUMBER, CANT_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] ^= [2]", STATEMENT],
+		["&=", 2, NUMBER, CANT_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL,"[1] &= [2]", STATEMENT],
+		["|=", 2, NUMBER, CANT_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] |= [2]", STATEMENT],
+		[">>=", 2, NUMBER, CANT_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] >>= [2]", STATEMENT],
+		["<<=", 2, NUMBER, CANT_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL,"[1] <<= [2]", STATEMENT]
+);
+
+var g_ruleList_mathy = new Array(
+		//operator, op. ways, formatted string
+		["+", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] + [2]", FRAGMENT],
+		["+", 1, NUMBER, CAN_BE_INSTANT_VAL, "+[1]", FRAGMENT],
+		["-", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] - [2]" , FRAGMENT],
+		["-", 1, NUMBER, CAN_BE_INSTANT_VAL, "-[1]", FRAGMENT],
+		["*", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] * [2]", FRAGMENT],
+		["%", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] % [2]" , FRAGMENT],
+		["/", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] / [2]", FRAGMENT],
+		["&", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] & [2]", FRAGMENT],
+		["^", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] ^ [2]", FRAGMENT],
+		["|", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] | [2]", FRAGMENT],
+		["||", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] || [2]", FRAGMENT],
+		["&&", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] && [2]", FRAGMENT],
+
+		
+		["!", 1, NUMBER, CAN_BE_INSTANT_VAL, "![1]", FRAGMENT],
+		["~", 1, NUMBER, CAN_BE_INSTANT_VAL, "~[1]", FRAGMENT],
+		["()", 1, NUMBER, CAN_BE_INSTANT_VAL, "([1])", FRAGMENT],
+		["[]", 1, NUMBER, CAN_BE_INSTANT_VAL, "[[1]]", FRAGMENT],
+		["==", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] == [2]", FRAGMENT],
+		[">=", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] >= [2]", FRAGMENT],
+		["<=", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] <= [2]", FRAGMENT],
+		["!=", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] != [2]", FRAGMENT],
+		["!==", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] !== [2]", FRAGMENT],
+		["===", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] === [2]", FRAGMENT],
+		[">>", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] >> [2]", FRAGMENT],
+		//[">>>", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] >>> [2]", FRAGMENT],
+		["<<", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] << [2]", FRAGMENT],
+		//["<<<", 2, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] <<< [2]", FRAGMENT],
+		
+		["?", 3, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, NUMBER, CAN_BE_INSTANT_VAL, "[1] ? [2] : [3]", FRAGMENT]
+);
+
+var g_funcList_mathy = new Array(
+		//retvalue, argcount, argtype, argdecl., func decl., fragment type
+		[NUMBER, 1, NUMBER, CAN_BE_INSTANT_VAL, "Math.abs([1])", FRAGMENT],
+		[NUMBER, 1, NUMBER, CAN_BE_INSTANT_VAL, "Math.acos([1])", FRAGMENT],
+		[NUMBER, 1, NUMBER, CAN_BE_INSTANT_VAL, "Math.asin([1])", FRAGMENT],
+		[NUMBER, 1, NUMBER, CAN_BE_INSTANT_VAL, "Math.atan([1])", FRAGMENT],
+		[NUMBER, 1, NUMBER, CAN_BE_INSTANT_VAL, "Math.atan2([1])", FRAGMENT],
+		[NUMBER, 1, NUMBER, CAN_BE_INSTANT_VAL, "Math.ceil([1])", FRAGMENT],
+		[NUMBER, 1, NUMBER, CAN_BE_INSTANT_VAL, "Math.cos([1])", FRAGMENT],
+		[NUMBER, 1, NUMBER, CAN_BE_INSTANT_VAL, "Math.exp([1])", FRAGMENT],
+		[NUMBER, 1, NUMBER, CAN_BE_INSTANT_VAL, "Math.floor([1])", FRAGMENT],
+		[NUMBER, 1, NUMBER, CAN_BE_INSTANT_VAL, "Math.log([1])", FRAGMENT],
+		[NUMBER, 1, COMMA_MULTILIST, CAN_BE_INSTANT_VAL, "Math.max([1])", FRAGMENT],
+		[NUMBER, 1, COMMA_MULTILIST, CAN_BE_INSTANT_VAL, "Math.min([1])", FRAGMENT],
+		[NUMBER, 1, NUMBER, CAN_BE_INSTANT_VAL, "Math.pow([1])", FRAGMENT],
+		//["Math.random", 1, NUMBER, CAN_BE_INSTANT_VAL, "Math.random([1])", FRAGMENT], //this will make result un-reproducable
+		[NUMBER, 1, NUMBER, CAN_BE_INSTANT_VAL, "Math.round([1])", FRAGMENT],
+		[NUMBER, 1, NUMBER, CAN_BE_INSTANT_VAL, "Math.sin([1])", FRAGMENT],
+		[NUMBER, 1, NUMBER, CAN_BE_INSTANT_VAL, "Math.sqrt([1])", FRAGMENT],
+		[NUMBER, 1, NUMBER, CAN_BE_INSTANT_VAL, "Math.tan([1])", FRAGMENT]
+);
+	
+var g_constList_mathy = new Array(
+	"Math.E", "Math.LN10", "Math.LN2",  "Math.LOG2E", "Math.LOG10E",  "Math.PI",  "Math.SQRT1_2",  "Math.SQRT2",
+	"Number.MAX_VALUE", "Number.MIN_VALUE", "Number.NaN", "Number.POSITIVE_INFINITY", "Number.NEGATIVE_INFINITY"
+);
+
+var g_interestingValue_mathy = new Array(
+	//not implemented
+);
+
+var g_alltanks = new Array();
+
+var g_tankVariant_mathy = new Array();
+var g_tankVariant_regexy = new Array();
+var g_tankVariant_stringy = new Array();
+
+var g_initSeed = 15125;
+
+var dont_access_qs = getQueryString('seed');
+if(dont_access_qs && dont_access_qs.length)
+{
+	g_initSeed = parseInt(dont_access_qs)
+}
+else
+{
+	g_initSeed = parseInt(Math.random() * 0xffffffff);
+	location.href = 'jsfuzz-chrome.html?seed=' + g_initSeed.toString();
+	
+}
+
+function getQueryString(name) { 
+var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i"); 
+var r = window.location.search.substr(1).match(reg); 
+if (r != null) return unescape(r[2]); return null; 
+} 
+
+</script>
+
+<!-- init above -->
+<!-- actual parts below -->
+<script src="runtime/init.js"></script>
+
+<script src="mathy/init.js"></script>
+<script src="mathy/mathfuzz.js"></script>
+
+<script src="arrayy/init.js"></script>
+<script src="arrayy/arrayFuzz.js"></script>
+
+<script src="regexy/init.js"></script>
+<script src="regexy/regexFuzz.js"></script>
+
+<script src="stringy/init.js"></script>
+<script src="stringy/stringfuzz.js"></script>
+
+<script src="enumy/init.js"></script>
+<script src="enumy/enumFuzz.js"></script>
+
+<script src="classy/init.js"></script>
+<script src="classy/classFuzz.js"></script>
+
+<script src="functiony/init.js"></script>
+<script src="functiony/functionfuzz.js"></script>
+
+
+<script src="gettersettery/getter/init.js"></script>
+<script src="gettersettery/getter/getterfuzz.js"></script>
+
+<script src="deletey/deletefuzz.js"></script>
+
+<script>
+
+function rnd(){
+    g_initSeed = ( g_initSeed * 9301 + 49297 ) % 233280; 
+    return g_initSeed / ( 233280.0 );
+};
+
+function randf(max)
+{
+	return rnd();
+}
+
+function rand(max)
+{
+	return parseInt(rnd() * (max));
+}
+
+function generateRndHex()
+{
+	return "0x" + rand(0xffffffff).toString(16);
+}
+
+function generateRndDec()
+{
+	return (rand(0xffffffff) * (rand(2) ? 1 : -1)).toString();
+}
+
+function generateRndDecFloat()
+{
+	return (randf(0xffffffff) * (rand(2) ? 1 : -1)).toString();
+}
+
+function generateRndConstant()
+{
+	return g_constList_mathy[parseInt(rand(g_constList_mathy.length))];
+}
+
+function generateRndVarFromTank()
+{
+	return g_tankVariant_mathy[parseInt(rand(g_tankVariant_mathy.length))];
+}
+
+
+function generateRndNumber()
+{
+	var rndNumber = parseInt(rand(6));
+	switch(rndNumber)
+	{
+		case 0:
+			return generateRndHex();
+		case 1:
+			return generateRndDec();
+		case 2:
+			return generateRndDecFloat();
+		case 3:
+			if(g_tankVariant_mathy && g_tankVariant_mathy.length)
+				return generateRndVarFromTank();
+		case 4:
+		default:
+			return generateRndConstant();
+	}
+}
+
+function generateRndPureNumber() // no left value will be generated
+{
+	var rndNumber = parseInt(rand(5));
+	switch(rndNumber)
+	{
+		case 0:
+			return generateRndHex();
+		case 1:
+			return generateRndDec();
+		case 2:
+			return generateRndDecFloat();
+		case 3:
+		default:
+			return generateRndConstant();
+	}
+}
+
+function getRandomInt(min, max) 
+{
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function getRndOneWayOp(leftOpIsConstant)
+{
+	//if(leftOpIsConstant)
+		return g_OneWayOp_fitForAll[rand(g_OneWayOp_fitForAll.length)];
+	//else
+	//	return rand(2) ? g_OneWayOp_LeftNon_Constant[rand(g_OneWayOp_LeftNon_Constant.length)] : g_OneWayOp_fitForAll[rand(g_OneWayOp_fitForAll.length)]
+}
+
+function getRndTwoWayOp(leftOpIsConstant)
+{
+	if(leftOpIsConstant)
+		return g_TwoWayOp_fitForAll[rand(g_TwoWayOp_fitForAll.length)];
+	else
+		return rand(2) ? g_TwoWayOp_LeftNon_Constant[rand(g_TwoWayOp_LeftNon_Constant.length)] : g_TwoWayOp_fitForAll[rand(g_TwoWayOp_fitForAll.length)]
+}
+
+
+function generateElementAccess(accessWhat, accessWhich)
+{
+	return accessWhat + "[" + accessWhich + "]";
+}
+
+function getOneOfInstancesInRuntime()
+{
+	var rnd = rand(2);
+	if(rnd)
+	{
+		return g_builtinTypes[rand(g_builtinTypes.length)];
+	}
+	else
+	{
+		return g_tankVariant_classyv[rand(g_tankVariant_classyv.length)];
+	}
+
+}
+
+function getRndItemInGlobalTank()
+{
+	var rndItemArray = g_alltanks[rand(g_alltanks.length)];
+	var rndOne = rndItemArray[rand(rndItemArray.length)]; 
+	return rndOne;
+}
+
+var g_funcList_windowy_returnString = new Array(
+	//retvalue, argcount, argtype, argdecl., func decl., fragment type
+	[STRING, 1, STRING, CAN_BE_INSTANT_VAL, "escape([1])", STATEMENT],
+	[STRING, 1, STRING, CAN_BE_INSTANT_VAL, "unescape([1])", STATEMENT],
+	[STRING, 1, STRING, CAN_BE_INSTANT_VAL, "decodeURI([1])", STATEMENT],
+	[STRING, 1, STRING, CAN_BE_INSTANT_VAL, "decodeURIComponent([1])", STATEMENT],
+	[STRING, 1, STRING, CAN_BE_INSTANT_VAL, "encodeURI([1])", STATEMENT],
+	[STRING, 1, STRING, CAN_BE_INSTANT_VAL, "encodeURIComponent([1])", STATEMENT]	
+);
+
+var g_funcList_windowy_returnUndef = new Array(
+
+	[UNDEFINED, 1, OBJECT, CAN_BE_INSTANT_VAL, "window.dump([1])", STATEMENT]
+);
+
+
+function generateOnePrototypeFuzzStmt()
+{
+	var rndPrototype = g_NScript_builtin_prototypes[rand(g_NScript_builtin_prototypes.length)];
+	
+	return rndPrototype + "=" + generateOneFunction(false, 1, true);
+}
+
+
+function prototypeFuzz()
+{
+	for(var i =0; i < 10; i++)
+		stmtPush( generateOnePrototypeFuzzStmt());
+}
+
+
+function tryAccessOneItemOfAny()
+{
+	var accessWhat = getRndItemInGlobalTank();
+	var accessStmt;
+	if(rand(2))
+		accessStmt = generateElementAccess(accessWhat, rand(0xffffffff));
+	else
+		accessStmt = generateElementAccess(accessWhat, rand(10));
+	
+	accessStmt += ".toString()"
+	return accessStmt
+}
+
+function subitemAccessFuzz()
+{
+	for(var i =0; i < 10; i++)
+		stmtPush( tryAccessOneItemOfAny());
+}
+
+
+function initVariantErrory()
+{
+
+
+}
+
+function getTmpId()
+{
+	return g_globalTankCount++;
+}
+
+function generateOneTimeoutFuzzStatement()
+{
+	var funcName = "vf_tmp_funcName_" + getTmpId().toString();
+	var funcDeclaration = "function " + funcName + "()";
+	var out = generateOneFunction(false, 0, false).replace("function ()", funcDeclaration) ;
+	out += "setTimeout('"+ funcName +"()', " + rand(0xffffffff).toString() + ");\n";
+	
+	stmtPush(funcName);
+	return out;
+}
+
+function tryTimeoutFuzz()
+{
+	for(var i =0; i < 10; i++)
+		stmtPush(generateOneTimeoutFuzzStatement());
+}
+
+String.prototype.startWith=function(str){     
+  var reg=new RegExp("^"+str);     
+  return reg.test(this);        
+}  
+
+String.prototype.endWith=function(str){     
+  var reg=new RegExp(str+"$");     
+  return reg.test(this);        
+}
+
+function stmtPush(pushWhat)
+{
+	var prefix = "var ";
+	var tmpVar = "tmp_var_autogen_" + g_fuzzingStmtTank.length.toString();
+	g_tankVariant_runtime.push(tmpVar);
+	if(!pushWhat.startWith("\\(")) //exclude (function )() form.
+	{
+		g_tankVariant_runtime.push(tmpVar);
+		if(pushWhat.length)
+			g_fuzzingStmtTank.push( prefix + tmpVar + " = " + pushWhat );
+		else
+			g_fuzzingStmtTank.push( prefix + tmpVar + " = null");
+	}
+	else 
+	{
+		g_fuzzingStmtTank.push(pushWhat);
+	}
+}
+
+function initAllTanks()
+{
+	g_alltanks[0] = g_tankVariant_mathy;
+	g_alltanks[1] = g_tankVariant_regexy;
+	g_alltanks[2] = g_tankVariant_stringy;
+	g_alltanks[3] = g_tankVariant_runtime;
+	g_alltanks[4] = g_tankVariant_arrayy;
+	g_alltanks[5] = g_tankVariant_classyf;
+	g_alltanks[6] = g_tankVariant_classyv;
+	g_alltanks[7] = g_tankVariant_functiony;
+	g_alltanks[8] = g_tankVariant_enumeratory;
+}
+
+function shuffle(aArr) {
+    var iLength = aArr.length,
+        i = iLength,
+        mTemp,
+        iRandom;
+ 
+    while(i--){
+        if(i !== (iRandom = Math.floor(Math.random() * iLength))){
+            mTemp = aArr[i];
+            aArr[i] = aArr[iRandom];
+            aArr[iRandom] = mTemp;
+        }
+    }
+ 
+    return aArr;
+}
+
+function messupAllTanks()
+{
+	g_fuzzingStmtTank = shuffle(g_fuzzingStmtTank);
+	//for(var i = 0; i < g_fuzzingStmtTank.length - 1; i++)
+
+}
+
+function outputAllThingsHTMLFormat(executeNow)
+{
+	var out = "<scrip"+"t>\nlog=console.log; \nvar globalCounter=0; \n" + "function reloadMe(){" + "location.href = 'lucky-jsfuzz-chrome.html?seed=" + parseInt(Math.random() * 0xffffffff) + "'; \n"+ "}; \n";
+
+	if(executeNow)
+		out += "setTimeout('reloadMe()', 2000); \n"
+
+	out += g_initScript.replace(/\n/g, "\n") + "\n" ;
+	
+	
+	//dont use join because i need to add something to this.
+	for(var i = 0; i < g_fuzzingStmtTank.length; i++)
+	{
+		out += "\n";
+		if(g_fuzzingStmtTank[i].indexOf("try") != 0)
+		{
+			out += "try{" + g_fuzzingStmtTank[i] + "} catch(e) {}";
+		}
+		else
+			out += g_fuzzingStmtTank[i]
+	}
+	
+	
+	
+	out += ";\n </scri"+ "pt>";
+	
+	while(out.indexOf(',,') > 0)
+		out = out.replace(/,,/g , ', 0,');
+	while(out.indexOf('--') > 0)
+		out = out.replace(/\-\-/g , '-');
+			
+	out = out.replace(/<>/g , '>');//bug
+	/*out = out.replace(/\+\-/g , '');//bug
+	out = out.replace(/\-\-/g , '');//bug
+	out = out.replace(/\+\+/g , '');//bug
+	out = out.replace(/globalCounter\+/g , 'globalCounter++');
+	*/
+	//document.write(out);
+	
+	
+	if(executeNow)
+		document.write(out);
+	else
+		document.body.innerText = out;
+}
+
+function initVariantRuntime()
+{
+	g_tankVariant_runtime.push("x_init_runtimevar");
+	g_initScript += "var x_init_runtimevar = this\n";
+}
+
+function getAllTanksCount()
+{
+	var out = 0;
+	for(var i = 0; i < g_alltanks.length; i++)
+	{
+		out += g_alltanks[i].length;
+	}
+	return out;
+}
+
+function messupEverything()
+{
+	//alert(getAllTanksCount());
+	
+	var maxSteps = rand(getAllTanksCount() / 5);
+	/*for(var i = 0; i < 1 + maxSteps / 2; i++)
+	{
+		var op = getRndItemInGlobalTank();
+		g_fuzzingStmtTank.push("try{ window.dump(" + op + "); } catch(e){}");
+	}
+	*/
+	
+	for(var i = 0; i < maxSteps; i++)
+	{
+		var op1 = getRndItemInGlobalTank();
+		var op2 = getRndItemInGlobalTank();
+		
+		var op3 = g_tankVariant_data_getaccessKeyTank[parseInt(rand(g_tankVariant_data_getaccessKeyTank.length))]
+		var op4 = '"' + g_tankVariant_data_getaccessValueTank[parseInt(rand(g_tankVariant_data_getaccessValueTank.length))] + '"';
+		
+		var op  = getRndTwoWayOp(false);
+		var opx = getRndOneWayOp(false);
+		if(rand(2))
+			g_fuzzingStmtTank.push ( op1 + op + op2 ) ;
+		else
+			g_fuzzingStmtTank.push (  opx + op1 ) ;
+		
+		if(rand(2))
+			g_fuzzingStmtTank.push ( op2 + "();");
+		
+		if(rand(2))
+			g_fuzzingStmtTank.push ( generateElementAccess(op2, op1) + ";" ) ;
+			
+		if(rand(4))
+			g_fuzzingStmtTank.push ( generateElementAccess(op2, op4) + ";" ) ;
+		
+		if(rand(4))
+			g_fuzzingStmtTank.push ( generateElementAccess(op3, op4) + ";" ) ;
+	}
+}
+
+function tryLastTime()
+{
+	 messupEverything();
+}
+
+function fuzzerMain()
+{
+	//`tank` is just a noun describes every variable we created in this round.
+	initAllTanks();
+	
+	//
+	//operations here are to keep all of those objects type-related 
+	//and we are trying to operate carefully.
+	//
+	
+	//initVariantErrory(); 
+	
+	//Runtime init will init every contents related to `util`
+	initVariantRuntime();
+	
+	initVariantTankMathy();
+	initVariantRegexy();
+	initVariantStringy();
+	initVariantArrayy();
+	initVariantEnumeratory();
+	initVariantAttrofobject();
+	initVariantClassy();
+	initVariantFunctiony();
+	initGetterInitFuzzer(); 
+	//initVariantGetter(); 
+	
+	//you can remove anything that you don't want to fuzz here.
+	mathFuzz();  
+	regexFuzz(); 
+	stringFuzz();
+	arrayFuzz();
+	enumFuzz(); 
+	classFuzz(); 
+	functionFuzz(); 
+	prototypeFuzz(); 
+	subitemAccessFuzz(); 
+	fuzzGetter();
+	deleteEverything();
+	
+	tryTimeoutFuzz(); 
+
+	messupAllTanks();
+
+	messupEverything(); 
+	//tryLastTime();
+	
+	//arg1
+	//true: output them in script tag, so we are running them instantly
+	//false: output them as text, so you can inspect them by yourself.
+	outputAllThingsHTMLFormat(false);
+} 
+
+fuzzerMain();
+</script>
+</html>
