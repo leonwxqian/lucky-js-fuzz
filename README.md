@@ -8,6 +8,9 @@ a) put all of those files under a web server
 
 b) visit lucky-jsfuzz-chrome.html
 
+    please notice the last line of lucky-jsfuzz-chrome.html: outputAllThingsHTMLFormat(false);
+    if you want to run the script instantly in the web-browser, you should change the arugment 'false' to 'true'.
+
 
 **Sample output:**
 
@@ -21,3 +24,8 @@ Wenxiang Qian (aka blastxiang), leonwxqian#gmail.com
 
 Blog: http://nul.pw
 
+**PS**
+
+I am not a pro on writing Javascript, and this fuzzer was written in a hurry. So the project is written in a very old yet ugly '90s style.
+
+It was formerly going to be used for fuzzing NScript, a script evaluation engine used in the Windows Defender, so there're only basic data type supported here. I will update often as I am prepare to use this to do more fuzzing work in the future.
