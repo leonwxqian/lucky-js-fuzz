@@ -59,6 +59,7 @@ var g_variant_tank_count_functiony = 3;
 var g_variant_tank_count_enumeratory = 3;
 var g_variant_tank_count_errory = 3;
 var g_variant_tank_count_getter = 3;
+var g_variant_tank_count_domy = 3;
 
 //level of nested statement.
 //this means level of () [].
@@ -80,6 +81,7 @@ var g_tankVariant_attrofobject = new Array();
 var g_tankVariant_arrayy = new Array();
 var g_tankVariant_classyv = new Array(); //var
 var g_tankVariant_classyf = new Array(); //function
+var g_tankVariant_domy = new Array();
 var g_tankVariant_functiony = new Array();
 var g_tankVariant_functiony_iterator = new Array();
 var g_tankVariant_enumeratory = new Array();
@@ -243,22 +245,27 @@ var g_tankVariant_stringy = new Array();
 
 var g_initSeed = 15125;
 
-var dont_access_qs = getQueryString('seed');
-if(dont_access_qs && dont_access_qs.length)
+var seed = getQueryString('seed');
+
+if(seed && seed.length)
 {
-	g_initSeed = parseInt(dont_access_qs)
+	g_initSeed = parseInt(seed)
 }
 else
 {
 	g_initSeed = parseInt(Math.random() * 0xffffffff);
-	location.href = 'jsfuzz-chrome.html?seed=' + g_initSeed.toString();
+	location.href = 'lucky-jsfuzz-chrome.html?seed=' + g_initSeed.toString();
 	
 }
 
-function getQueryString(name) { 
-var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i"); 
-var r = window.location.search.substr(1).match(reg); 
-if (r != null) return unescape(r[2]); return null; 
+function getQueryString(name) 
+{ 
+	var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i"); 
+	var x = window.location.search.substr(1);
+	var r = x.match(reg); 
+	if (r != null) 
+		return unescape(r[2]); 
+	return null; 
 } 
 
 </script>
@@ -293,6 +300,8 @@ if (r != null) return unescape(r[2]); return null;
 <script src="gettersettery/getter/getterfuzz.js"></script>
 
 <script src="deletey/deletefuzz.js"></script>
+
+<script src="domy/init.js"></script>
 
 <script>
 
@@ -687,6 +696,8 @@ function fuzzerMain()
 	
 	//initVariantErrory(); 
 	
+	initVariantDomy();
+	
 	//Runtime init will init every contents related to `util`
 	initVariantRuntime();
 	
@@ -700,6 +711,9 @@ function fuzzerMain()
 	initVariantFunctiony();
 	initGetterInitFuzzer(); 
 	//initVariantGetter(); 
+	
+	
+	//domFuzz(); //not finish yet.
 	
 	//you can remove anything that you don't want to fuzz here.
 	mathFuzz();  
