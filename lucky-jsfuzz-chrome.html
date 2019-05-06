@@ -1,8 +1,8 @@
 <html>
 <title>lucky-js-fuzzer</title>
 <!--
-	@author :   Wenxiang Qian (aka 'blastxiang')
-	@email  :   leonwxqian@gmail.com
+	@author :   Wenxiang Qian (@leonwxqian) of Tencent Blade Team
+	@email  :   leonwxqian@gmail.com / leonwxqian@qq.com
 	@website:   http://nul.pw
 	@licence:   Licensed under the MIT license
 	
@@ -296,7 +296,7 @@ function getQueryString(name)
 <script src="functiony/functionfuzz.js"></script>
 
 
-<script src="gettersettery/getter/init.js"></script>
+<!--<script src="gettersettery/getter/init.js"></script>-->
 <script src="gettersettery/getter/getterfuzz.js"></script>
 
 <script src="deletey/deletefuzz.js"></script>
@@ -576,12 +576,13 @@ function messupAllTanks()
 
 }
 
+function reloadMe(){
+	location.href = "lucky-jsfuzz-chrome.html?seed=" + parseInt(Math.random() * 0xffffffff);
+}
+
 function outputAllThingsHTMLFormat(executeNow)
 {
-	var out = "<scrip"+"t>\nlog=console.log; \nvar globalCounter=0; \n" + "function reloadMe(){" + "location.href = 'lucky-jsfuzz-chrome.html?seed=" + parseInt(Math.random() * 0xffffffff) + "'; \n"+ "}; \n";
-
-	if(executeNow)
-		out += "setTimeout('reloadMe()', 2000); \n"
+	var out = "\nlog=console.log; \nvar globalCounter=0; \n\n";
 
 	out += g_initScript.replace(/\n/g, "\n") + "\n" ;
 	
@@ -600,7 +601,7 @@ function outputAllThingsHTMLFormat(executeNow)
 	
 	
 	
-	out += ";\n </scri"+ "pt>";
+	out += ";\n";
 	
 	while(out.indexOf(',,') > 0)
 		out = out.replace(/,,/g , ', 0,');
@@ -616,10 +617,14 @@ function outputAllThingsHTMLFormat(executeNow)
 	//document.write(out);
 	
 	
-	if(executeNow)
-		document.write(out);
+	if(executeNow){
+	
+		setTimeout('reloadMe()', 4000);
+		try { eval(out) }catch(e){};
+
+	}
 	else
-		document.body.innerText = out;
+		document.body.innerText = "<scri"+"pt>" + out + "</script" + ">";
 }
 
 function initVariantRuntime()
