@@ -29,6 +29,7 @@ Blog: http://nul.pw
 When you use this, there should **obviously** with some problems like:
 * When render is hanged, the page won't redirect to new seed. => maybe you need to write an extension or something to force it reload.
 * When there's an out-of-memory, the page will die and cause some false alarms if you have monitored the status of page. => a simple hack: modify chromium , when oom is happen, reload current page. Same thing for page hang.
+* Many oom are caused by RegEx operations, and hang are caused by dom insertion, you can comment out these two fuzzers to increase the fuzzing speed if you don't want to fuzz them.
 
 Of course you can use this as a functional fuzzer, however, this is just designed to be a part of fuzzing system which means this is lacking of some functions which couldn't be done by just javascript. For example: crash monitoring, binary level error handling, crash reporting... You should add them by yourself, FF/Chromium/V8 is open source so I think you can do it easily. :)
 
