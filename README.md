@@ -25,6 +25,7 @@ Wenxiang Qian (Twitter: @leonwxqian / Weibo: @leonwxqian) of Tencent Blade Team,
 Blog: http://nul.pw
 
 **Hacks to use this smoother**
+
 When you use this, there should **obviously** with some problems like:
 * When render is hanged, the page won't redirect to new seed. => maybe you need to write an extension or something to force it reload.
 * When there's an out-of-memory, the page will die and cause some false alarms if you have monitored the status of page. => a simple hack: modify chromium , when oom is happen, reload current page. Same thing for page hang.
